@@ -1,27 +1,15 @@
-from dronekit import connect, LocationGlobalRelative
-from drone_operations import arm_and_takeoff, land
-from config import DRONE_CONNECTIONS, TRIANGLE_POINTS
+from dronekit import connect
+from drone_operations import operate_drones
+from config import DRONE_CONNECTIONS
 import threading
 
-# Function to handle the operations of each drone
-def operate_drone(vehicle, target_altitude, hover_time, drone_id, target_location):
-    arm_and_takeoff(vehicle, target_altitude, hover_time, drone_id)
-    print(f"{drone_id}: Moving to triangle formation location...")
-    
-    # Move to the specified target location
-    vehicle.simple_goto(LocationGlobalRelative(target_location[0], target_location[1], target_location[2]))
-    
-    # Wait until the drone reaches the target location
-    while True:
-        current_location = vehicle.location.global_relative_frame
-        distance = ((current_location.lat - target_location[0])**2 + (current_location.lon - target_location[1])**2)**0.5
-        print(f"{drone_id}: Distance to target: {distance:.2f} meters", end='\r')
-        if distance < 1:  # Adjust the threshold as needed
-            print(f"\n{drone_id}: Reached formation point")
-            break
-        time.sleep(1)
-    
-    land(vehicle, drone_id)  # Land after reaching the target
+# Define takeoff altitude and hover time
+TAKEOFF_ALTITUDE = 2  # meters
+HOVER_TIME = 10       # seconds
+
+# User's location (update these to the user's actual coordinates)
+USER_LATITUDE = -35.3631723  # Example latitude
+USER_LONGITUDE = 149.1652367  # Example longitude
 
 # Connect to each drone using configuration
 vehicles = {}
@@ -30,19 +18,15 @@ for drone_id, connection in DRONE_CONNECTIONS.items():
     vehicles[drone_id] = connect(connection, wait_ready=True)
     print(f"{drone_id} connected")
 
-# Create threads for each drone's operations with specific target locations
-threads = []
-for idx, (drone_id, vehicle) in enumerate(vehicles.items()):
-    thread = threading.Thread(target=operate_drone, args=(vehicle, 10, 10 + idx * 5, drone_id, TRIANGLE_POINTS[idx]))
-    threads.append(thread)
+# Create a list of vehicles for operate_drones function
+drone_list = list(vehicles.values())
 
-# Start all threads
-for thread in threads:
-    thread.start()
+# Start the drone operations in a thread
+drone_operation_thread = threading.Thread(target=operate_drones, args=(drone_list, TAKEOFF_ALTITUDE, HOVER_TIME, USER_LATITUDE, USER_LONGITUDE))
+drone_operation_thread.start()
 
-# Wait for all threads to complete
-for thread in threads:
-    thread.join()
+# Wait for the drone operations to complete
+drone_operation_thread.join()
 
 # Close connections
 for vehicle in vehicles.values():

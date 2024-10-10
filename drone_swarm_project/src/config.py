@@ -9,7 +9,7 @@ DRONE_CONNECTIONS = {
 
 # Triangle formation coordinates (latitude, longitude, altitude)
 TRIANGLE_POINTS = [
-    (37.7925, -122.3959, 10),  # Drone 1
-    (37.7927, -122.3965, 10),  # Drone 2
-    (37.7923, -122.3961, 10)   # Drone 3
+    (37.7925, -122.3959, 1),  # Drone 1
+    (37.7927, -122.3965, 1),  # Drone 2
+    (37.7923, -122.3961, 1)   # Drone 3
 ]
