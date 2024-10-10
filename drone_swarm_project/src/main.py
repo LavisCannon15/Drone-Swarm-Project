@@ -15,7 +15,9 @@ USER_LONGITUDE = 149.1652367  # Example longitude
 vehicles = {}
 for drone_id, connection in DRONE_CONNECTIONS.items():
     print(f"Connecting to {drone_id} on: {connection}")
-    vehicles[drone_id] = connect(connection, wait_ready=True)
+    vehicle = connect(connection, wait_ready=True)
+    vehicle.id = drone_id  # Assign the drone_id to the vehicle
+    vehicles[drone_id] = vehicle
     print(f"{drone_id} connected")
 
 # Create a list of vehicles for operate_drones function
