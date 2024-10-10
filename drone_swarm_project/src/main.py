@@ -1,15 +1,17 @@
 from dronekit import connect
 from drone_operations import operate_drones
-from config import DRONE_CONNECTIONS
+from config import DRONE_CONNECTIONS, TAKEOFF_ALTITUDE, HOVER_TIME, USER_LATITUDE, USER_LONGITUDE
+from global_vars import stop_operations_event  # Import the event
 import threading
+import signal
+import sys
 
-# Define takeoff altitude and hover time
-TAKEOFF_ALTITUDE = 2  # meters
-HOVER_TIME = 10       # seconds
+def signal_handler(sig, frame):
+    print("Signal received! Stopping drone operations...")
+    stop_operations_event.set()  # Set the event to True
 
-# User's location (update these to the user's actual coordinates)
-USER_LATITUDE = -35.3631723  # Example latitude
-USER_LONGITUDE = 149.1652367  # Example longitude
+# Register signal handler for graceful shutdown
+signal.signal(signal.SIGINT, signal_handler)
 
 # Connect to each drone using configuration
 vehicles = {}
@@ -27,9 +29,19 @@ drone_list = list(vehicles.values())
 drone_operation_thread = threading.Thread(target=operate_drones, args=(drone_list, TAKEOFF_ALTITUDE, HOVER_TIME, USER_LATITUDE, USER_LONGITUDE))
 drone_operation_thread.start()
 
-# Wait for the drone operations to complete
-drone_operation_thread.join()
+# Main loop: wait for the drone operations to complete or stop
+try:
+    while not stop_operations_event.is_set():
+        drone_operation_thread.join(timeout=1)
+except KeyboardInterrupt:
+    print("Keyboard interrupt received! Stopping drone operations...")
+    stop_operations_event.set()  # Gracefully stop the drones
 
-# Close connections
+# Ensure drones have stopped and landed
+drone_operation_thread.join()  # Wait for the drone operations thread to finish
+
+# Close all vehicle connections
 for vehicle in vehicles.values():
     vehicle.close()
+
+print("Drone connections closed. Exiting.")

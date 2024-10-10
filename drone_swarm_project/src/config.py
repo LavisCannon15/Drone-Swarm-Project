@@ -1,15 +1,20 @@
-# config.py
+# Configuration file for drone settings
 
-# Define connection strings for each drone (using UDP)
+# Define takeoff altitude and hover time
+TAKEOFF_ALTITUDE = 2  # meters
+HOVER_TIME = 10       # seconds
+
+# User's location (update these to the user's actual coordinates)
+USER_LATITUDE = -35.3631723  # Example latitude
+USER_LONGITUDE = 149.1652367  # Example longitude
+
+# Offset distance for drone positions (in meters, converted to degrees)
+DESIRED_DISTANCE_M = 3  # meters
+OFFSET_DISTANCE = DESIRED_DISTANCE_M / 111139  # Convert meters to degrees
+
+# Drone connection strings (example configuration)
 DRONE_CONNECTIONS = {
-    "drone1": 'udp:127.0.0.1:14550',
-    "drone2": 'udp:127.0.0.1:14560',
-    "drone3": 'udp:127.0.0.1:14570',
+    "drone_1": "127.0.0.1:14550",
+    "drone_2": "127.0.0.1:14560",
+    "drone_3": "127.0.0.1:14570"
 }
-
-# Triangle formation coordinates (latitude, longitude, altitude)
-TRIANGLE_POINTS = [
-    (37.7925, -122.3959, 1),  # Drone 1
-    (37.7927, -122.3965, 1),  # Drone 2
-    (37.7923, -122.3961, 1)   # Drone 3
-]
