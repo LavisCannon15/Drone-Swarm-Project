@@ -58,6 +58,7 @@ def ensure_equal_distance(drones, triangle_positions, min_distance):
             drone2_pos = triangle_positions[j]
             distance = great_circle(drone1_pos, drone2_pos).meters
 
+
             if distance < min_distance:
                 print(f"Adjusting positions for {drones[i].id} and {drones[j].id}")
                 # Calculate the adjustment needed to maintain distance
