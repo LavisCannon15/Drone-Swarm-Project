@@ -8,14 +8,22 @@ from global_vars import stop_operations_event  # Import the event
 def arm_and_takeoff(vehicle, target_altitude, drone_id):
     print(f"{drone_id}: Changing to GUIDED mode...")
     vehicle.mode = VehicleMode("GUIDED")
-    
+
     while not vehicle.mode.name == "GUIDED":
         print(f"{drone_id}: Waiting for GUIDED mode...")
+        if stop_operations_event.is_set():  # Check if the stop event is triggered
+            print(f"{drone_id}: Stop operations signal received during mode change.")
+            land(vehicle, drone_id)  # Land the drone if stopping
+            return
         time.sleep(1)
 
     print(f"{drone_id}: Waiting for vehicle to be ready to arm...")
     while not vehicle.is_armable:
         print(f"{drone_id}: Vehicle not armable yet. Waiting...")
+        if stop_operations_event.is_set():  # Check if the stop event is triggered
+            print(f"{drone_id}: Stop operations signal received while checking arming status.")
+            land(vehicle, drone_id)  # Land the drone if stopping
+            return
         time.sleep(1)
 
     print(f"{drone_id}: Arming...")
@@ -23,18 +31,28 @@ def arm_and_takeoff(vehicle, target_altitude, drone_id):
 
     while not vehicle.armed:
         print(f"{drone_id}: Waiting for arming...")
+        if stop_operations_event.is_set():  # Check if the stop event is triggered
+            print(f"{drone_id}: Stop operations signal received while waiting to arm.")
+            land(vehicle, drone_id)  # Land the drone if stopping
+            return
         time.sleep(1)
 
     print(f"{drone_id}: Taking off to {target_altitude} meters...")
     vehicle.simple_takeoff(target_altitude)
 
+    # Monitor altitude during takeoff
     while True:
         altitude = vehicle.location.global_relative_frame.alt
         print(f"{drone_id}: Altitude: {altitude:.2f} meters")
+        if stop_operations_event.is_set():  # Check if the stop event is triggered
+            print(f"{drone_id}: Stop operations signal received during takeoff.")
+            land(vehicle, drone_id)  # Land the drone if stopping
+            return
         if altitude >= target_altitude * 0.95:
             print(f"{drone_id}: Reached target altitude.")
             break
         time.sleep(1)
+
 
 def land(vehicle, drone_id):
     print(f"{drone_id}: Landing...")
