@@ -49,7 +49,7 @@ def calculate_triangle_positions(reference_lat, reference_lon, offset_distance):
         (reference_lat - offset_distance / 2, reference_lon - (offset_distance * (3**0.5)) / 2)   # Bottom right drone
     ]
     return triangle_positions
-
+""""
 def ensure_equal_distance(drones, triangle_positions, min_distance):
     # Ensure all drones maintain the minimum distance
     for i in range(len(drones)):
@@ -73,6 +73,7 @@ def ensure_equal_distance(drones, triangle_positions, min_distance):
                 )
     
     return triangle_positions
+"""
 
 def move_to_positions(drones, triangle_positions):
     for drone, target_position in zip(drones, triangle_positions):
@@ -80,11 +81,38 @@ def move_to_positions(drones, triangle_positions):
         print(f"{drone_id}: Moving to triangle position at {target_position}...")
         drone.simple_goto(LocationGlobalRelative(target_position[0], target_position[1], drone.location.global_relative_frame.alt))
 
-def simulate_user_movement(reference_lat, reference_lon):
-    """Simulate user movement by adding a small random offset to their position."""
-    delta_lat = random.uniform(-0.00001, 0.00001)
-    delta_lon = random.uniform(-0.00001, 0.00001)
-    return reference_lat + delta_lat, reference_lon + delta_lon
+import time
+
+def simulate_user_movement(reference_lat, reference_lon, movement_step=0.0001, pause_duration=0.5):
+    """Simulate user movement by moving in a defined pattern with pauses."""
+    movements = [
+        (movement_step, 0),       # Forward
+        (0, movement_step),       # Rightward
+        (-movement_step, 0),      # Downward
+        (0, -movement_step),      # Leftward
+        (movement_step, 0)        # Forward again
+    ]
+    
+    # Use a static variable to maintain the current movement index
+    if not hasattr(simulate_user_movement, "current_index"):
+        simulate_user_movement.current_index = 0
+    
+    # Get the current movement
+    movement = movements[simulate_user_movement.current_index]
+    
+    # Update the reference position
+    new_lat = reference_lat + movement[0]
+    new_lon = reference_lon + movement[1]
+    
+    # Update the index for the next movement
+    simulate_user_movement.current_index = (simulate_user_movement.current_index + 1) % len(movements)
+
+    # Pause for a specified duration between movements
+    time.sleep(pause_duration)
+
+    return new_lat, new_lon
+
+
 
 def operate_drones(drones, target_altitude, reference_lat, reference_lon):
     global stop_operations_event  # Use the global stop flag
@@ -108,13 +136,13 @@ def operate_drones(drones, target_altitude, reference_lat, reference_lon):
         # Main loop: move drones based on simulated user movement
         while not stop_operations_event.is_set():  # Check the event correctly
             # Simulate user movement (you would replace this with real GPS data for the user)
-            current_lat, current_lon = simulate_user_movement(reference_lat, reference_lon)
+            current_lat, current_lon = simulate_user_movement(reference_lat, reference_lon, movement_step=0.0001, pause_duration=1.0)
             
             # Calculate the triangle positions around the user's updated location
             triangle_positions = calculate_triangle_positions(current_lat, current_lon, OFFSET_DISTANCE)
 
             # Ensure drones are at equal distance
-            triangle_positions = ensure_equal_distance(drones, triangle_positions, min_distance=5)  # 5 meters as an example
+            """triangle_positions = ensure_equal_distance(drones, triangle_positions, min_distance=5)  # 5 meters as an example"""
 
             # Move drones to their new positions
             move_to_positions(drones, triangle_positions)
