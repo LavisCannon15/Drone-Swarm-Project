@@ -5,6 +5,7 @@ import threading
 from config import OFFSET_DISTANCE
 from global_vars import stop_operations_event
 from geopy.distance import great_circle  # Ensure you have geopy installed
+import numpy as np
 
 def arm_and_takeoff(vehicle, target_altitude, drone_id):
     print(f"{drone_id}: Changing to GUIDED mode...")
@@ -81,37 +82,31 @@ def move_to_positions(drones, triangle_positions):
         print(f"{drone_id}: Moving to triangle position at {target_position}...")
         drone.simple_goto(LocationGlobalRelative(target_position[0], target_position[1], drone.location.global_relative_frame.alt))
 
-import time
 
-def simulate_user_movement(reference_lat, reference_lon, movement_step=0.0001, pause_duration=0.5):
-    """Simulate user movement by moving in a defined pattern with pauses."""
-    movements = [
-        (movement_step, 0),       # Forward
-        (0, movement_step),       # Rightward
-        (-movement_step, 0),      # Downward
-        (0, -movement_step),      # Leftward
-        (movement_step, 0)        # Forward again
-    ]
-    
-    # Use a static variable to maintain the current movement index
-    if not hasattr(simulate_user_movement, "current_index"):
-        simulate_user_movement.current_index = 0
-    
-    # Get the current movement
-    movement = movements[simulate_user_movement.current_index]
-    
-    # Update the reference position
-    new_lat = reference_lat + movement[0]
-    new_lon = reference_lon + movement[1]
-    
-    # Update the index for the next movement
-    simulate_user_movement.current_index = (simulate_user_movement.current_index + 1) % len(movements)
+def read_accelerometer_data():
+    """Simulate reading data from the MPU6050 accelerometer."""
+    # Simulate accelerometer readings for X, Y, Z axes
+    ax = random.uniform(-0.5, 0.5)  # Simulate side-to-side movements
+    ay = random.uniform(0.5, 1.0)    # Simulate forward movement
+    az = random.uniform(-0.1, 0.1)    # Simulate downward movement
+    return ax, ay, az
 
+def simulate_user_movement(reference_lat, reference_lon, pause_duration=0.5, walking_speed=0.0001):
+    """Simulate user movement using GPS and accelerometer data."""
+    ax, ay, az = read_accelerometer_data()
+
+    # Calculate movement based on accelerometer data
+    movement_lat = ay * walking_speed # Forward/backward motion
+    movement_lon = ax * walking_speed  # Right/left motion
+
+    # Update position based on movements
+    new_lat = reference_lat + movement_lat
+    new_lon = reference_lon + movement_lon
+    
     # Pause for a specified duration between movements
     time.sleep(pause_duration)
 
     return new_lat, new_lon
-
 
 
 def operate_drones(drones, target_altitude, reference_lat, reference_lon):
@@ -136,7 +131,7 @@ def operate_drones(drones, target_altitude, reference_lat, reference_lon):
         # Main loop: move drones based on simulated user movement
         while not stop_operations_event.is_set():  # Check the event correctly
             # Simulate user movement (you would replace this with real GPS data for the user)
-            current_lat, current_lon = simulate_user_movement(reference_lat, reference_lon, movement_step=0.0001, pause_duration=1.0)
+            current_lat, current_lon = simulate_user_movement(reference_lat, reference_lon, pause_duration=1.0, walking_speed=0.0001)
             
             # Calculate the triangle positions around the user's updated location
             triangle_positions = calculate_triangle_positions(current_lat, current_lon, OFFSET_DISTANCE)
