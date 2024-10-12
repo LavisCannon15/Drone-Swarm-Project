@@ -58,7 +58,6 @@ def ensure_equal_distance(drones, triangle_positions, min_distance):
             drone2_pos = triangle_positions[j]
             distance = great_circle(drone1_pos, drone2_pos).meters
 
-
             if distance < min_distance:
                 print(f"Adjusting positions for {drones[i].id} and {drones[j].id}")
                 # Calculate the adjustment needed to maintain distance
@@ -87,7 +86,7 @@ def simulate_user_movement(reference_lat, reference_lon):
     delta_lon = random.uniform(-0.00001, 0.00001)
     return reference_lat + delta_lat, reference_lon + delta_lon
 
-def operate_drones(drones, target_altitude, hover_time, reference_lat, reference_lon):
+def operate_drones(drones, target_altitude, reference_lat, reference_lon):
     global stop_operations_event  # Use the global stop flag
 
     # Arm and take off each drone
@@ -108,8 +107,10 @@ def operate_drones(drones, target_altitude, hover_time, reference_lat, reference
     try:
         # Main loop: move drones based on simulated user movement
         while not stop_operations_event.is_set():  # Check the event correctly
-            # Calculate new positions based on current simulated user movement
+            # Simulate user movement (you would replace this with real GPS data for the user)
             current_lat, current_lon = simulate_user_movement(reference_lat, reference_lon)
+            
+            # Calculate the triangle positions around the user's updated location
             triangle_positions = calculate_triangle_positions(current_lat, current_lon, OFFSET_DISTANCE)
 
             # Ensure drones are at equal distance
@@ -118,8 +119,8 @@ def operate_drones(drones, target_altitude, hover_time, reference_lat, reference
             # Move drones to their new positions
             move_to_positions(drones, triangle_positions)
 
-            # Hover for a short period (adjustable)
-            time.sleep(hover_time)
+            # Short sleep to give time for drones to adjust (you can adjust this for smoother movement)
+            time.sleep(1)  # You can make this shorter for more responsive movements
 
     except KeyboardInterrupt:
         # Handle keyboard interrupt
