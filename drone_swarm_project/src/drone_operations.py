@@ -50,7 +50,7 @@ def calculate_triangle_positions(reference_lat, reference_lon, offset_distance):
         (reference_lat - offset_distance / 2, reference_lon - (offset_distance * (3**0.5)) / 2)   # Bottom right drone
     ]
     return triangle_positions
-""""
+
 def ensure_equal_distance(drones, triangle_positions, min_distance):
     # Ensure all drones maintain the minimum distance
     for i in range(len(drones)):
@@ -74,12 +74,12 @@ def ensure_equal_distance(drones, triangle_positions, min_distance):
                 )
     
     return triangle_positions
-"""
+
 
 def move_to_positions(drones, triangle_positions):
     for drone, target_position in zip(drones, triangle_positions):
         drone_id = drone.id if hasattr(drone, 'id') else 'Unknown'
-        print(f"{drone_id}: Moving to triangle position at {target_position}...")
+        #print(f"{drone_id}: Moving to triangle position at {target_position}...")
         drone.simple_goto(LocationGlobalRelative(target_position[0], target_position[1], drone.location.global_relative_frame.alt))
 
 
@@ -91,23 +91,129 @@ def read_accelerometer_data():
     az = random.uniform(-0.1, 0.1)    # Simulate downward movement
     return ax, ay, az
 
-def simulate_user_movement(reference_lat, reference_lon, pause_duration=0.5, walking_speed=0.0001):
-    """Simulate user movement using GPS and accelerometer data."""
-    ax, ay, az = read_accelerometer_data()
+def read_gyroscope_data():
+    """Simulate reading data from the MPU6050 gyroscope."""
+    # Simulate gyroscope readings for rotations around X, Y, Z axes
+    gx = random.uniform(-5.0, 5.0)  # Simulate roll rate (degrees/sec)
+    gy = random.uniform(-5.0, 5.0)  # Simulate pitch rate (degrees/sec)
+    gz = random.uniform(-5.0, 5.0)  # Simulate yaw rate (degrees/sec)
+    return gx, gy, gz
 
-    # Calculate movement based on accelerometer data
-    movement_lat = ay * walking_speed # Forward/backward motion
-    movement_lon = ax * walking_speed  # Right/left motion
+def simulate_gps_data(reference_lat, reference_lon):
+    """Simulate a GPS reading based on a reference latitude and longitude."""
+    gps_lat = reference_lat + random.uniform(-0.00001, 0.00001)
+    gps_lon = reference_lon + random.uniform(-0.00001, 0.00001)
+    return gps_lat, gps_lon
+   
 
-    # Update position based on movements
-    new_lat = reference_lat + movement_lat
-    new_lon = reference_lon + movement_lon
+def read_compass_data():
+    """Simulate reading data from a compass (magnetometer)."""
+    # Simulate a heading value representing the orientation in degrees (0-360)
+    heading = random.uniform(0, 360)
+    return heading
+
+def kalman_filter(state, P, measurement, accel, gyro, compass, dt):
+    """Perform one iteration of the Kalman filter with extended data.
+
+    state: The current state (lat, lon, v_lat, v_lon).
+    P: The current state covariance matrix.
+    measurement: The GPS measurement (lat, lon).
+    accel: The accelerometer data (ax, ay).
+    gyro: The gyroscope data (gx, gy, gz).
+    compass: The compass heading in degrees.
+    dt: Time step between updates.
+    """
+    # State transition matrix (A)
+    A = np.array([
+        [1, 0, dt, 0],  # Update latitude based on velocity_lat * dt
+        [0, 1, 0, dt],  # Update longitude based on velocity_lon * dt
+        [0, 0, 1, 0],   # Velocity_lat remains the same in the absence of acceleration
+        [0, 0, 0, 1]    # Velocity_lon remains the same in the absence of acceleration
+    ])
     
+    # Control input model (B)
+    B = np.array([
+        [0.5 * dt ** 2, 0],
+        [0, 0.5 * dt ** 2],
+        [dt, 0],
+        [0, dt]
+    ])
+    
+    # Control vector (acceleration in lat and lon directions)
+    u = np.array([accel[1], accel[0]])  # ax affects lon, ay affects lat
+    
+    # Process noise covariance (Q)
+    Q = np.eye(4) * 0.001  # Small uncertainty in prediction
+    
+    # Predict next state
+    state = A @ state + B @ u
+    P = A @ P @ A.T + Q
+    
+    # Measurement update (Z) - actual GPS measurements
+    Z = np.array([measurement[0], measurement[1]])  # [lat, lon]
+    
+    # Measurement matrix (H)
+    H = np.array([
+        [1, 0, 0, 0],  # Measure latitude directly
+        [0, 1, 0, 0]   # Measure longitude directly
+    ])
+    
+    # Measurement noise covariance (R)
+    R = np.eye(2) * 0.01  # GPS measurement noise
+    
+    # Innovation or measurement residual (Y)
+    Y = Z - H @ state
+    
+    # Innovation covariance (S)
+    S = H @ P @ H.T + R
+    
+    # Kalman gain (K)
+    K = P @ H.T @ np.linalg.inv(S)
+    
+    # Update state estimate and covariance
+    state = state + K @ Y
+    P = (np.eye(4) - K @ H) @ P
+
+    # Integrate gyroscope and compass data if needed (e.g., for orientation adjustments)
+    # Here, you can use gx, gy, gz, and heading to refine position or orientation tracking.
+    
+    return state, P
+
+def simulate_user_movement(reference_lat, reference_lon, pause_duration=0.5):
+    """Simulate user movement using GPS, accelerometer, gyroscope, and compass data."""
+    # Initial state: [latitude, longitude, velocity_lat, velocity_lon]
+    state = np.array([reference_lat, reference_lon, 0, 0])
+    P = np.eye(4)  # Initial uncertainty
+
+    # Time step (in seconds)
+    dt = pause_duration
+
+    # Simulate a GPS reading every time step using the new function
+    gps_lat, gps_lon = simulate_gps_data(reference_lat, reference_lon)
+
+    # Read accelerometer, gyroscope, and compass data
+    ax, ay, az = read_accelerometer_data()
+    gx, gy, gz = read_gyroscope_data()
+    heading = read_compass_data()
+
+    # Update the state using the Kalman filter
+    state, P = kalman_filter(state, P, (gps_lat, gps_lon), (ax, ay), (gx, gy, gz), heading, dt)
+
+    # Extract updated latitude and longitude from the state
+    new_lat = state[0]
+    new_lon = state[1]
+
+    # Extract speed from Kalman filter state (state[2] and state[3] are velocities)
+    kalman_speed_x = state[2]
+    kalman_speed_y = state[3]
+
+    # Output only Kalman speed
+    print(f"Kalman Speed (User): {np.sqrt(kalman_speed_x**2 + kalman_speed_y**2):.2f} m/s")
+
     # Pause for a specified duration between movements
     time.sleep(pause_duration)
 
     return new_lat, new_lon
-
 
 def operate_drones(drones, target_altitude, reference_lat, reference_lon):
     global stop_operations_event  # Use the global stop flag
@@ -131,13 +237,13 @@ def operate_drones(drones, target_altitude, reference_lat, reference_lon):
         # Main loop: move drones based on simulated user movement
         while not stop_operations_event.is_set():  # Check the event correctly
             # Simulate user movement (you would replace this with real GPS data for the user)
-            current_lat, current_lon = simulate_user_movement(reference_lat, reference_lon, pause_duration=1.0, walking_speed=0.0001)
+            current_lat, current_lon = simulate_user_movement(reference_lat, reference_lon, pause_duration=1.0)
             
             # Calculate the triangle positions around the user's updated location
             triangle_positions = calculate_triangle_positions(current_lat, current_lon, OFFSET_DISTANCE)
 
             # Ensure drones are at equal distance
-            """triangle_positions = ensure_equal_distance(drones, triangle_positions, min_distance=5)  # 5 meters as an example"""
+            #triangle_positions = ensure_equal_distance(drones, triangle_positions, min_distance=5)  # 5 meters as an example
 
             # Move drones to their new positions
             move_to_positions(drones, triangle_positions)
