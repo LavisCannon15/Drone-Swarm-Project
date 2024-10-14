@@ -80,8 +80,8 @@ def move_to_positions(drones, triangle_positions,kalman_user_speed):
     for drone, target_position in zip(drones, triangle_positions):
         drone_id = drone.id if hasattr(drone, 'id') else 'Unknown'
         #print(f"{drone_id}: Moving to triangle position at {target_position}...")
-        drone.airspeed = kalman_user_speed
-        drone.simple_goto(LocationGlobalRelative(target_position[0], target_position[1], drone.location.global_relative_frame.alt))
+        #drone.airspeed = kalman_user_speed
+        drone.simple_goto(LocationGlobalRelative(target_position[0], target_position[1], drone.location.global_relative_frame.alt),kalman_user_speed)
         print(f"{drone_id}: Speed {drone.airspeed:.2f} m/s (User Kalman Speed: {kalman_user_speed:.2f} m/s)")
     
 
@@ -182,7 +182,7 @@ def kalman_filter(state, P, measurement, accel, gyro, compass, dt):
     
     return state, P
 
-def simulate_user_movement(reference_lat, reference_lon, pause_duration=0.0):
+def simulate_user_movement(reference_lat, reference_lon, pause_duration=0.5):
     """Simulate user movement using GPS, accelerometer, gyroscope, and compass data."""
     # Initial state: [latitude, longitude, velocity_lat, velocity_lon]
     state = np.array([reference_lat, reference_lon, 0, 0])
@@ -217,6 +217,19 @@ def simulate_user_movement(reference_lat, reference_lon, pause_duration=0.0):
 
     return new_lat, new_lon, kalman_user_speed  # Return Kalman speed
 
+
+def handle_drone_exceptions(e, stop_operations_event):
+    if isinstance(e, KeyboardInterrupt):
+        print("KeyboardInterrupt detected, stopping drone operations.")
+    elif isinstance(e, TimeoutError):
+        print("TimeoutError: Communication with the drone timed out. Initiating landing sequence.")
+    elif isinstance(e, ValueError):
+        print(f"ValueError: {e}. Initiating landing sequence for safety.")
+    else:
+        print(f"Unexpected error: {e}. Initiating landing sequence.")
+    
+    stop_operations_event.set()
+
 def operate_drones(drones, target_altitude, reference_lat, reference_lon):
     global stop_operations_event  # Use the global stop flag
 
@@ -243,6 +256,8 @@ def operate_drones(drones, target_altitude, reference_lat, reference_lon):
             
             # Calculate the triangle positions around the user's updated location
             triangle_positions = calculate_triangle_positions(current_lat, current_lon, OFFSET_DISTANCE)
+            triangle_positions = ensure_equal_distance(drones, triangle_positions, min_distance=5)  # 5 meters as an example
+
 
             # Move drones to their new positions
             move_to_positions(drones, triangle_positions, kalman_user_speed)
@@ -250,25 +265,8 @@ def operate_drones(drones, target_altitude, reference_lat, reference_lon):
             # Short sleep to give time for drones to adjust
             time.sleep(1)
 
-    except KeyboardInterrupt:
-        # Handle keyboard interrupt
-        print("KeyboardInterrupt detected, stopping drone operations.")
-        stop_operations_event.set()
-
-    except TimeoutError:
-        # Handle communication timeouts or delays
-        print("TimeoutError: Communication with the drone timed out. Initiating landing sequence.")
-        stop_operations_event.set()
-
-    except ValueError as e:
-        # Handle data-related issues (e.g., invalid coordinates or speed)
-        print(f"ValueError: {e}. Initiating landing sequence for safety.")
-        stop_operations_event.set()
-
-    except Exception as e:
-        # Handle any other unexpected errors
-        print(f"Unexpected error: {e}. Initiating landing sequence.")
-        stop_operations_event.set()
+    except (KeyboardInterrupt, TimeoutError, ValueError, Exception) as e:
+        handle_drone_exceptions(e, stop_operations_event)
 
     finally:
         # Ensure that the drones land regardless of the reason for stopping
@@ -278,5 +276,5 @@ def operate_drones(drones, target_altitude, reference_lat, reference_lon):
                 land(drone, drone_id)
             except Exception as e:
                 print(f"Error during landing of {drone_id}: {e}")
-                
+
         print("Drones have landed safely.")
