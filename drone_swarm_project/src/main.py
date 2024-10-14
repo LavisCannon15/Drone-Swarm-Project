@@ -1,10 +1,11 @@
 from dronekit import connect
 from drone_operations import operate_drones
-from config import DRONE_CONNECTIONS, TAKEOFF_ALTITUDE, HOVER_TIME, USER_LATITUDE, USER_LONGITUDE
+from config import DRONE_CONNECTIONS, TAKEOFF_ALTITUDE, HOVER_TIME, USER_LATITUDE, USER_LONGITUDE, OFFSET_DISTANCE
 from global_vars import stop_operations_event  # Import the event
 import threading
 import signal
 import sys
+import time
 
 def signal_handler(sig, frame):
     print("Signal received! Stopping drone operations...")
@@ -28,6 +29,7 @@ drone_list = list(vehicles.values())
 # Start the drone operations in a thread
 drone_operation_thread = threading.Thread(target=operate_drones, args=(drone_list, TAKEOFF_ALTITUDE, USER_LATITUDE, USER_LONGITUDE))
 drone_operation_thread.start()
+
 
 # Main loop: wait for the drone operations to complete or stop
 try:
