@@ -4,8 +4,8 @@ from config import DRONE_CONNECTIONS, TAKEOFF_ALTITUDE, HOVER_TIME, USER_LATITUD
 from global_vars import stop_operations_event  # Import the event
 import threading
 import signal
-import sys
-import time
+#import sys
+#import time
 
 def signal_handler(sig, frame):
     print("Signal received! Stopping drone operations...")
@@ -27,7 +27,7 @@ for drone_id, connection in DRONE_CONNECTIONS.items():
 drone_list = list(vehicles.values())
 
 # Start the drone operations in a thread
-drone_operation_thread = threading.Thread(target=operate_drones, args=(drone_list, TAKEOFF_ALTITUDE, USER_LATITUDE, USER_LONGITUDE))
+drone_operation_thread = threading.Thread(target=operate_drones, args=(drone_list, TAKEOFF_ALTITUDE, USER_LATITUDE, USER_LONGITUDE, OFFSET_DISTANCE))
 drone_operation_thread.start()
 
 

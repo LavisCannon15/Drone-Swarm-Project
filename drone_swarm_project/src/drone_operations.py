@@ -1,11 +1,13 @@
+#drone_operations.py
+
 import random
 from dronekit import Vehicle, LocationGlobalRelative, VehicleMode
 import time
 import threading
-from config import OFFSET_DISTANCE
 from global_vars import stop_operations_event
 from geopy.distance import great_circle  # Ensure you have geopy installed
 import numpy as np
+from error_handler import monitor_drones, handle_drone_exceptions
 
 def arm_and_takeoff(vehicle, target_altitude, drone_id):
     print(f"{drone_id}: Changing to GUIDED mode...")
@@ -59,6 +61,8 @@ def ensure_equal_distance(drones, triangle_positions, min_distance):
             drone2_pos = triangle_positions[j]
             distance = great_circle(drone1_pos, drone2_pos).meters
 
+            print(f"Distance between {drones[i].id} and {drones[j].id}: {distance} meters")
+
             if distance < min_distance:
                 print(f"Adjusting positions for {drones[i].id} and {drones[j].id}")
                 # Calculate the adjustment needed to maintain distance
@@ -76,14 +80,37 @@ def ensure_equal_distance(drones, triangle_positions, min_distance):
     return triangle_positions
 
 
+def ensure_equal_distance_from_user(drones, triangle_positions, current_lat, current_lon, min_distance):
+    # Ensure all drones maintain the minimum distance from the user's current location
+    for i, drone_pos in enumerate(triangle_positions):
+        distance_to_user = great_circle(drone_pos, (current_lat, current_lon)).meters
+        print(f"Distance between {drones[i].id} and user: {distance_to_user} meters")
+
+        if distance_to_user < min_distance:
+            print(f"Adjusting position for {drones[i].id} to maintain distance from user")
+            # Adjust position away from the user
+            adjustment = (min_distance - distance_to_user)
+            direction = np.array([drone_pos[0] - current_lat, drone_pos[1] - current_lon])
+            direction_normalized = direction / np.linalg.norm(direction)  # Normalize direction
+            
+            triangle_positions[i] = (
+                drone_pos[0] + adjustment * direction_normalized[0],
+                drone_pos[1] + adjustment * direction_normalized[1]
+            )
+    
+    return triangle_positions
+
+
 def move_to_positions(drones, triangle_positions,kalman_user_speed):
     for drone, target_position in zip(drones, triangle_positions):
         drone_id = drone.id if hasattr(drone, 'id') else 'Unknown'
-        #print(f"{drone_id}: Moving to triangle position at {target_position}...")
+
         #drone.airspeed = kalman_user_speed
+        #print(f"{drone_id}: Moving to triangle position at {target_position}...")
+
         drone.simple_goto(LocationGlobalRelative(target_position[0], target_position[1], drone.location.global_relative_frame.alt),kalman_user_speed)
+
         print(f"{drone_id}: Speed {drone.airspeed:.2f} m/s (User Kalman Speed: {kalman_user_speed:.2f} m/s)")
-    
 
 
 def read_accelerometer_data():
@@ -218,19 +245,8 @@ def simulate_user_movement(reference_lat, reference_lon, pause_duration=0.5):
     return new_lat, new_lon, kalman_user_speed  # Return Kalman speed
 
 
-def handle_drone_exceptions(e, stop_operations_event):
-    if isinstance(e, KeyboardInterrupt):
-        print("KeyboardInterrupt detected, stopping drone operations.")
-    elif isinstance(e, TimeoutError):
-        print("TimeoutError: Communication with the drone timed out. Initiating landing sequence.")
-    elif isinstance(e, ValueError):
-        print(f"ValueError: {e}. Initiating landing sequence for safety.")
-    else:
-        print(f"Unexpected error: {e}. Initiating landing sequence.")
-    
-    stop_operations_event.set()
 
-def operate_drones(drones, target_altitude, reference_lat, reference_lon):
+def operate_drones(drones, target_altitude, reference_lat, reference_lon,offset_distance):
     global stop_operations_event  # Use the global stop flag
 
     # Arm and take off each drone
@@ -255,12 +271,17 @@ def operate_drones(drones, target_altitude, reference_lat, reference_lon):
             current_lat, current_lon, kalman_user_speed = simulate_user_movement(reference_lat, reference_lon, pause_duration=1.0)
             
             # Calculate the triangle positions around the user's updated location
-            triangle_positions = calculate_triangle_positions(current_lat, current_lon, OFFSET_DISTANCE)
-            triangle_positions = ensure_equal_distance(drones, triangle_positions, min_distance=5)  # 5 meters as an example
-
+            triangle_positions = calculate_triangle_positions(current_lat, current_lon, offset_distance)
+            triangle_positions = ensure_equal_distance(drones, triangle_positions, min_distance=3)  #35 meters as an example
+            triangle_positions = ensure_equal_distance_from_user(drones, triangle_positions, current_lat, current_lon, min_distance=3)  # Ensure distance from user
 
             # Move drones to their new positions
             move_to_positions(drones, triangle_positions, kalman_user_speed)
+
+
+
+            # Monitor drones for issues (battery, GPS, etc.)
+            monitor_drones(drones, low_battery_threshold=20, stop_operations_event=stop_operations_event)
 
             # Short sleep to give time for drones to adjust
             time.sleep(1)

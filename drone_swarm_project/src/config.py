@@ -1,3 +1,4 @@
+# config.py
 # Configuration file for drone settings
 
 # Define takeoff altitude and hover time
@@ -9,7 +10,7 @@ USER_LATITUDE = -35.3631723  # Example latitude
 USER_LONGITUDE = 149.1652367  # Example longitude
 
 # Offset distance for drone positions (in meters, converted to degrees)
-DESIRED_DISTANCE_M = 3  # meters
+DESIRED_DISTANCE_M = 4  # meters
 OFFSET_DISTANCE = DESIRED_DISTANCE_M / 111139  # Convert meters to degrees
 
 # Drone connection strings (example configuration)
