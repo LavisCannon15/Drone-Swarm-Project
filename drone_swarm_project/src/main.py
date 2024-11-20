@@ -1,11 +1,23 @@
+#main.py
+
 from dronekit import connect
 from drone_operations import operate_drones
-from config import DRONE_CONNECTIONS, TAKEOFF_ALTITUDE, HOVER_TIME, USER_LATITUDE, USER_LONGITUDE, OFFSET_DISTANCE
+from config import (
+    DRONE_CONNECTIONS,
+    TAKEOFF_ALTITUDE,
+    USER_LATITUDE,
+    USER_LONGITUDE,
+    OFFSET_DISTANCE,
+    ORBIT_AROUND_USER,
+    SWAP_POSITIONS,
+    SWAP_POSITION_SPEED,
+    ROTATE_TRIANGLE_FORMATION,
+    ANGLE_OFFSET,
+    REVOLVE_SPEED,
+    REVOLVE_OFFSET_DISTANCE,
+)
 from global_vars import stop_operations_event  # Import the event
-import threading
 import signal
-#import sys
-#import time
 
 def signal_handler(sig, frame):
     print("Signal received! Stopping drone operations...")
@@ -26,23 +38,27 @@ for drone_id, connection in DRONE_CONNECTIONS.items():
 # Create a list of vehicles for operate_drones function
 drone_list = list(vehicles.values())
 
-# Start the drone operations in a thread
-drone_operation_thread = threading.Thread(target=operate_drones, args=(drone_list, TAKEOFF_ALTITUDE, USER_LATITUDE, USER_LONGITUDE, OFFSET_DISTANCE))
-drone_operation_thread.start()
-
-
-# Main loop: wait for the drone operations to complete or stop
+# Run the drone operations directly
 try:
-    while not stop_operations_event.is_set():
-        drone_operation_thread.join(timeout=1)
+    operate_drones(
+        drone_list,
+        TAKEOFF_ALTITUDE,
+        USER_LATITUDE,
+        USER_LONGITUDE,
+        OFFSET_DISTANCE,
+        ORBIT_AROUND_USER,
+        SWAP_POSITIONS,
+        SWAP_POSITION_SPEED,
+        ROTATE_TRIANGLE_FORMATION,
+        ANGLE_OFFSET,
+        REVOLVE_SPEED,
+        REVOLVE_OFFSET_DISTANCE,
+    )
 except KeyboardInterrupt:
     print("Keyboard interrupt received! Stopping drone operations...")
     stop_operations_event.set()  # Gracefully stop the drones
 
-# Ensure drones have stopped and landed
-drone_operation_thread.join()  # Wait for the drone operations thread to finish
-
-# Close all vehicle connections
+# Ensure drones have stopped and landed (this logic should be in operate_drones)
 for vehicle in vehicles.values():
     vehicle.close()
 

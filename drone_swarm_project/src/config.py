@@ -9,9 +9,29 @@ HOVER_TIME = 3       # seconds
 USER_LATITUDE = -35.3631723  # Example latitude
 USER_LONGITUDE = 149.1652367  # Example longitude
 
-# Offset distance for drone positions (in meters, converted to degrees)
-DESIRED_DISTANCE_M = 4  # meters
-OFFSET_DISTANCE = DESIRED_DISTANCE_M / 111139  # Convert meters to degrees
+
+
+
+# Offset distance for drone positions 
+OFFSET_DISTANCE = 4  # Convert meters to degrees
+
+ORBIT_AROUND_USER = True # Activates/Deactivates revolvement
+
+REVOLVE_OFFSET_DISTANCE = 4
+ANGLE_OFFSET = 0 #Starting Point (like the position of the hour hand)
+REVOLVE_SPEED = 40 #Speed of revolution in m/s (Adjust this value for faster or slower revolving)
+
+
+ROTATE_TRIANGLE_FORMATION = False
+
+
+SWAP_POSITIONS = False
+SWAP_POSITION_SPEED = 3
+
+
+
+
+
 
 # Drone connection strings (example configuration)
 DRONE_CONNECTIONS = {

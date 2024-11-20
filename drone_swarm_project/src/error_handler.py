@@ -35,15 +35,32 @@ def check_battery(drone, low_battery_threshold, stop_operations_event):
     """Check if the drone's battery is below the threshold."""
     if drone.battery.level < low_battery_threshold:
         raise LowBatteryError(f"Drone {drone.id} battery level is too low: {drone.battery.level}.")
-
+    
+    
 def check_drone_status(drone, stop_operations_event):
-    """Check if the drone is flying."""
+    """Check if the drone is flying and listen for critical messages."""
+    # Register a message listener for critical messages
+    drone.add_message_listener('CRITICAL', handle_critical_message)
+
     vertical_velocity = drone.velocity[2]  # Vertical velocity (m/s, negative means descending)
     altitude = drone.location.global_relative_frame.alt  # Current altitude (m)
+    attitude_error = abs(drone.attitude.roll) + abs(drone.attitude.pitch)  # Combined roll and pitch error
 
     # Check for potential crash conditions
     if vertical_velocity < -5 and altitude < 1: 
         raise DroneCrashError(f"Drone {drone.id} has crashed or is not in a flying state.")
+    if attitude_error > 30:  # Threshold for angle error
+        raise DroneCrashError(f"Drone {drone.id} has excessive attitude error: {attitude_error} degrees.")
+    if not drone.armed:
+        raise DroneCrashError(f"Drone {drone.id} unexpectedly disarmed.")
+
+def handle_critical_message(message):
+    """Handle critical messages from the drone."""
+    if 'CRASH' in message:
+        raise DroneCrashError(f"Drone reported a crash condition: {message}")
+    # You can handle other messages or log them as needed
+    print(f"Received critical message from drone: {message}")
+
 
 def check_gps(drone, stop_operations_event):
     """Check if the drone has a valid GPS fix."""
